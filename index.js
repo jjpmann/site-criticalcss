@@ -2,13 +2,12 @@
 
 var criticalcss = require('criticalcss'),
     cleancss = require('clean-css'),
-    request = require('request'),
+    Request = require('request'),
     path = require('path'),
     fs = require('fs'),
-    tmpDir = require('os').tmpdir();
-
-
- 
+    tmpDir = require('os').tmpdir(),
+    humanizeUrl = require('humanize-url');
+  
 var SC = function () {};
 
 SC.prototype.run = function(pages, opts) {
@@ -18,9 +17,12 @@ SC.prototype.run = function(pages, opts) {
         // Folder to store cricitalcss
         output: './data/',
 
-        // Clean CSS
-        clean: false,
+        // Request options
+        request: {},
 
+        // Clean CSS Options
+        minify: false,
+        cleancss: {},
         // Critical CSS default options
         width: 1200,
         height: 900,
@@ -32,10 +34,15 @@ SC.prototype.run = function(pages, opts) {
 
     var opts = Object.assign(defaults, opts || {});
 
+    var request = Request.defaults(opts.request);
+
     var now = new Date(),
         _pages = [],
         _output = {},
-        count = 0;
+        _rules = '',
+        count = 0,
+        cssPath = '',
+        currentPage;
 
     function showError(err) {
         console.error('Error: ', err );
@@ -54,19 +61,37 @@ SC.prototype.run = function(pages, opts) {
      //        }
      //    }
 
+     function start(pages) {
 
+        console.log( '-- start' );
 
-    function processArray(pages) {
+        _pages = pages;
+
+        cssPath = path.join( tmpDir, humanizeUrl(opts.base) + '.css' )
+        console.log( 'cssPath: ' + cssPath );
+        
+        fs.unlink(cssPath, function(){
+            getCss(function(){
+                console.log( 'done getCss -> getRules()' );
+                getRules();
+            });
+        });
+     }
+
+    function processPages(pages) {
+
+        console.log( '-- processPages' );
+
         if (typeof pages != 'undefined') {
             _pages = pages
         }
 
         if (_pages.length) {
-            var page = _pages.shift();
-            //console.log( item );
-            processPage(page);
+            currentPage = _pages.shift();
+            processPage();
         } else {
             console.log( 'Done' );
+
             //writeFile(JSON.stringify(_output));
         }
     }
@@ -78,35 +103,79 @@ SC.prototype.run = function(pages, opts) {
             if (err) return showError(err);
         });
 
+        if (opts.minify) {
+            file = file.replace('.css','.min.css');
+            var css = new cleancss(opts.cleancss.options).minify(string);
+            string = css.styles;
+            fs.writeFile(file, string, function (err) {
+                if (err) return showError(err);
+            });
+        }
+
         console.log( 'All Done: file saved as '+ file );
     }
 
-    function processPage(page) {
-        console.log( 'open page: ' + page.url );
+    function cleanCss(source) {
+        var options = { /* options */ };
+        // retur 
+    }
 
-        var cssUrl = opts.cssUrl;
-        var cssPath = path.join( tmpDir, page.filename );
+    function processPage() {
+        console.log( 'cssPath: ' + cssPath );
+        findCritical();
+    }
 
-        request(cssUrl).pipe(fs.createWriteStream(cssPath)).on('close', function() {
-            criticalcss.getRules(cssPath, function(err, output) {
-                if (err) {
-                    throw new Error(err);
-                } else {
-                    criticalcss.findCritical(page.url, { rules: JSON.parse(output) }, function(err, output) {
-                        if (err) {
-                            throw new Error(err);
-                        } else {
-                            writeFile(page.filename, output);
-                            processArray();
-                        }
-                    });
-                }
+    function getCss(callback) {
+
+        console.log( '-- getCss' );
+
+        var cssUrl = opts.cssUrls.shift();
+        if (typeof cssUrl == 'undefined') {
+            return callback();
+        }
+        console.log( 'get: ' + cssUrl );
+
+        request(cssUrl)
+            .pipe(fs.createWriteStream(cssPath,{'flags':'a'}))
+            .on('close', function(){
+                getCss(callback);
             });
-        });
 
     }
 
-    return processArray(pages);
+    function getRules() {
+
+        console.log( '--getRules' );
+
+        criticalcss.getRules(cssPath, function(err, output) {
+            if (err) {
+                throw new Error(err);
+            } else {
+                _rules = JSON.parse(output);
+                console.log( 'done getRules -> processPages()' );
+                processPages();
+            }
+        });
+    }
+
+    function findCritical(output) {
+
+        console.log( '-- findCritical' );
+        
+        var fullUrl = opts.base + currentPage.url;
+        console.log( 'open page: ' + fullUrl );
+        
+        criticalcss.findCritical(fullUrl, { rules: _rules }, function(err, output) {
+            if (err) {
+                throw new Error(err);
+            } else {
+                writeFile(currentPage.filename, output);
+                processPages();
+            }
+        });
+    }
+
+    return start(pages);
 
 }
 

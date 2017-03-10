@@ -21,7 +21,9 @@
     "clean-css": "^4.0.5",
     "criticalcss": "^2.1.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "humanize-url": "^1.0.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
