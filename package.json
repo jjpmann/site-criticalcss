@@ -15,22 +15,14 @@
     "type": "git",
     "url": "git+https://github.com/jjpmann/site-criticalcss.git"
   },
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "index.js",
   "dependencies": {
     "clean-css": "^4.0.5",
-    "criticalcss": "^2.1.0"
-  },
-  "devDependencies": {
+    "criticalcss": "^2.1.0",
     "humanize-url": "^1.0.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "bin": {
-    "scc": "bin/criticalcss.bin.js"
-  },
-  "config": {
-    "yaya": "haha"
-  }
 }
