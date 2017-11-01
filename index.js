@@ -14,8 +14,8 @@ SC.prototype.run = function(pages, opts) {
 
     // defaults
     var defaults = {
-        // Folder to store cricitalcss
-        output: './data/',
+        // // Folder to store cricitalcss
+        // output: './data/',
 
         // Request options
         request: {},
@@ -24,12 +24,16 @@ SC.prototype.run = function(pages, opts) {
         minify: false,
         cleancss: {},
         // Critical CSS default options
-        width: 1200,
-        height: 900,
-        forceInclude: [],
-        rules: [], // REQUIRED
-        buffer: 800*1024,
-        ignoreConsole: false,
+        critical: {
+            output: null,
+            width: 1200,
+            height: 900,
+            forceInclude: [],
+            rules: [], // REQUIRED
+            buffer: 800*1024,
+            ignoreConsole: false,
+            restoreFontFaces: false
+        }
     }
 
     var opts = Object.assign(defaults, opts || {});
@@ -97,7 +101,7 @@ SC.prototype.run = function(pages, opts) {
     }
 
     function writeFile(file, string) {
-        var file =  opts.output + file;
+        var file =  opts.critical.output + file;
 
         fs.writeFile(file, string, function (err) {
             if (err) return showError(err);
@@ -105,7 +109,10 @@ SC.prototype.run = function(pages, opts) {
 
         if (opts.minify) {
             file = file.replace('.css','.min.css');
-            var css = new cleancss(opts.cleancss.options).minify(string);
+
+            console.log(opts.cleancss);
+
+            var css = new cleancss(opts.cleancss).minify(string);
             string = css.styles;
             fs.writeFile(file, string, function (err) {
                 if (err) return showError(err);
@@ -164,14 +171,28 @@ SC.prototype.run = function(pages, opts) {
         
         var fullUrl = opts.base + currentPage.url;
         console.log( 'open page: ' + fullUrl );
-        
-        criticalcss.findCritical(fullUrl, { rules: _rules }, function(err, output) {
+
+        var criticalOptions = opts.critical;
+        criticalOptions.rules = _rules;
+
+        criticalcss.findCritical(fullUrl, criticalOptions, function(err, output) {
             if (err) {
                 throw new Error(err);
             } else {
-                writeFile(currentPage.filename, output);
-                processPages();
-            }
+                    
+                var originalCSS = fs.readFileSync(cssPath).toString();
+                output = criticalcss.restoreOriginalDefs(originalCSS, output);
+
+                // // NOTE This should follow the original declarations restoration above
+                // // so that if a `font-family` declaration was restored from the original
+                // // CSS the corresponding `@font-face` will be included.
+                if (criticalOptions.restoreFontFaces) {
+                    output = criticalcss.restoreFontFaces(originalCSS, output);
+                }
+
+                 writeFile(currentPage.filename, output);
+                 processPages();
+               }
         });
     }
 
